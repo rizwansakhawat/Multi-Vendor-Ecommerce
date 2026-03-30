@@ -22,6 +22,13 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     
     path('api/', include('accounts.urls')),
+    path('api/products/', include('products.urls')),
+    path('api/orders/',  include('orders.urls')),
+    path('api/vendors/', include('vendors.urls')),
+    path('api/reviews/', include('reviews.urls')),
+    path('api/payments/', include('payments.urls')),
+    
+    
     
     # path('', include('rest_framework.urls')),  # For browsable API login/logout
 
