@@ -4,6 +4,7 @@ from .serializers import CartSerializer, CartItemSerializer, OrderSerializer, Or
 from rest_framework import generics, permissions, viewsets
 from accounts.permission import IsVendor, IsAdminOrVendorOwner, IsBuyer
 from rest_framework.permissions import IsAuthenticated
+from .tasks import send_order_created_email
 
 
 
@@ -40,6 +41,10 @@ class OrderViewSet(viewsets.ModelViewSet):
             return Order.objects.filter(items__product__vendor=user.vendorprofile).distinct()
         
         return Order.objects.filter(user=user)
+
+    def perform_create(self, serializer):
+        order = serializer.save(user=self.request.user)
+        send_order_created_email.delay(order.id)
     
             
     

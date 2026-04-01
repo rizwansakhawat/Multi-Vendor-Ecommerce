@@ -1,0 +1,21 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.venv/
+
+# Local environment secrets
+.env
+.env.*
+!.env.example
+
+# SQLite database (local dev)
+db.sqlite3
+db.sqlite3/
+
+# Misc
+.DS_Store
+Thumbs.db

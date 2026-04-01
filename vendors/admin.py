@@ -3,8 +3,9 @@ from .models import VendorProfile, VendorPayout, VendorTransaction
 
 
 class VendorProfileAdmin(admin.ModelAdmin):
-    list_display = ('shop_name', 'user_email', 'total_sales', 'total_orders', 'average_rating', 'total_reviews')
-    search_fields = ('shop_name', 'user__email')
+    list_display = ('shop_name', 'shop_slug', 'user_email', 'total_sales', 'total_orders', 'average_rating', 'total_reviews')
+    search_fields = ('shop_name', 'shop_slug', 'user__email')
+    readonly_fields = ('shop_slug',)
     
     def user_email(self, obj):
         return obj.user.email

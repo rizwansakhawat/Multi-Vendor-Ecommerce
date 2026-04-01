@@ -30,7 +30,7 @@ urlpatterns = [
     
     
     
-    # path('', include('rest_framework.urls')),  # For browsable API login/logout
+    path('', include('rest_framework.urls')),  # For browsable API login/logout
 
     
     

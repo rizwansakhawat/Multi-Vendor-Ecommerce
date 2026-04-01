@@ -1,6 +1,7 @@
 from django.db import models
 from django.conf import settings
 from django.core.validators import MinValueValidator, MaxValueValidator
+from django.utils.text import slugify
 from accounts.models import User
 
 class VendorProfile(models.Model):
@@ -36,6 +37,19 @@ class VendorProfile(models.Model):
     
     def __str__(self):
         return self.shop_name
+
+    def save(self, *args, **kwargs):
+        if not self.shop_slug or self.shop_slug != slugify(self.shop_name):
+            base_slug = slugify(self.shop_name)
+            self.shop_slug = base_slug
+
+            # Check uniqueness and append counter if needed
+            counter = 1
+            while VendorProfile.objects.filter(shop_slug=self.shop_slug).exclude(pk=self.pk).exists():
+                self.shop_slug = f'{base_slug}-{counter}'
+                counter += 1
+
+        super().save(*args, **kwargs)
     
     def calculate_commission(self, sale_amount):
         return (sale_amount * self.commission_rate) / 100

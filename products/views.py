@@ -5,7 +5,7 @@ from .models import Product, Category
 from .serializers import ProductSerializer, CategorySerializer  
 from rest_framework import generics, permissions, viewsets
 from accounts.permission import IsVendor, IsAdminOrVendorOwner, IsBuyer
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.pagination import PageNumberPagination
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters
@@ -46,9 +46,10 @@ class ProductViewSet(viewsets.ModelViewSet):
     
     def get_permissions(self):
         if self.action in ['create', 'update', 'partial_update', 'destroy']:
-            return [permissions.IsAdminUser, IsVendor]
+            self.permission_classes = [permissions.IsAdminUser | IsVendor]
         else:
-            return [permissions.AllowAny]
+            self.permission_classes = [permissions.AllowAny]
+        return super().get_permissions()
     
     def get_queryset(self):
         if self.action == 'list':

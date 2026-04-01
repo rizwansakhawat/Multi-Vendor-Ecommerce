@@ -1,4 +1,5 @@
 from django.shortcuts import render
+from django.contrib.auth import login
 from rest_framework import generics , status, permissions
 from rest_framework.response import Response
 from .models import Address, User
@@ -34,6 +35,11 @@ class LoginView(generics.CreateAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data['user']
+
+        # Allow DRF browsable API login state after successful API login.
+        user.backend = 'django.contrib.auth.backends.ModelBackend'
+        login(request, user)
+
         refresh = RefreshToken.for_user(user)
         return Response({
             'user': UserSerializer(user).data,

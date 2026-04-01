@@ -24,9 +24,10 @@ class CategoryAdmin(admin.ModelAdmin):
     
     
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ['name', 'vendor', 'category', 'price', 'stock', 'status', 'created_at']
+    list_display = ['name', 'slug', 'vendor', 'category', 'price', 'stock', 'status', 'created_at']
     list_filter = ['status', 'created_at', 'category']
-    search_fields = ['name', 'description']
+    search_fields = ['name', 'slug', 'description']
+    readonly_fields = ['slug']
     inlines = [ProductImageInline]
     
 admin.site.register(Category, CategoryAdmin)

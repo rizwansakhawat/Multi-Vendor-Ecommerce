@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils.text import slugify
 from vendors.models import VendorProfile as Vendor
 
 
@@ -25,6 +26,19 @@ class Product(models.Model):
 
     def __str__(self):
         return self.name
+
+    def save(self, *args, **kwargs):
+        if not self.slug or self.slug != slugify(self.name):
+            base_slug = slugify(self.name)
+            self.slug = base_slug
+
+            # Check uniqueness and append counter if needed
+            counter = 1
+            while Product.objects.filter(slug=self.slug).exclude(pk=self.pk).exists():
+                self.slug = f'{base_slug}-{counter}'
+                counter += 1
+
+        super().save(*args, **kwargs)
     
     
 class ProductImage(models.Model):
