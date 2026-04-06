@@ -31,7 +31,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
 			raise ValidationError({'order_id': 'Order not found.'})
 
 		if user.role == 'buyer' and order.user_id != user.id:
-			raise PermissionDenied('You can only pay for your own order.')
+			raise PermissionDenied('You can only pay for your own  .')
 
 		if user.role == 'vendor':
 			is_vendor_order = order.orderitem_set.filter(product__vendor__user=user).exists()
@@ -82,8 +82,8 @@ class PaymentViewSet(viewsets.ModelViewSet):
 		stripe.api_key = settings.STRIPE_SECRET_KEY
 		amount_in_cents = int((Decimal(order.total_price) * 100).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
 
-		success_url = request.data.get('success_url') or settings.STRIPE_SUCCESS_URL
-		cancel_url = request.data.get('cancel_url') or settings.STRIPE_CANCEL_URL
+		success_url = settings.STRIPE_SUCCESS_URL
+		cancel_url = settings.STRIPE_CANCEL_URL
 
 		session = stripe.checkout.Session.create(
 			mode='payment',
@@ -126,6 +126,89 @@ class PaymentViewSet(viewsets.ModelViewSet):
 		)
 
 
+def _mark_stripe_payment_paid(order_id, session_id, payment_intent=None):
+	payment = Payment.objects.filter(transaction_id=session_id).first()
+	if not payment and order_id:
+		payment = Payment.objects.filter(order_id=str(order_id), payment_method='stripe').order_by('-created_at').first()
+
+	if payment:
+		payment.status = 'paid'
+		payment.transaction_id = payment_intent or session_id
+		payment.save(update_fields=['status', 'transaction_id'])
+
+	if order_id:
+		Order.objects.filter(pk=order_id).update(status='paid')
+		try:
+			send_order_paid_email.delay(int(order_id))
+		except Exception:
+			# Payment state should not fail if background email queue is unavailable.
+			pass
+
+
+def _metadata_value(metadata, key):
+	if metadata is None:
+		return None
+
+	if hasattr(metadata, 'get'):
+		value = metadata.get(key)
+		if value is not None:
+			return value
+
+	try:
+		return metadata[key]
+	except Exception:
+		return None
+
+
+class StripeSuccessView(APIView):
+	authentication_classes = []
+	permission_classes = [AllowAny]
+
+	def get(self, request):
+		if stripe is None:
+			return Response({'detail': 'Stripe SDK not installed.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+		if not settings.STRIPE_SECRET_KEY:
+			return Response({'detail': 'STRIPE_SECRET_KEY is not configured.'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+		session_id = request.query_params.get('session_id')
+		if not session_id:
+			return Response({'detail': 'session_id is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+		stripe.api_key = settings.STRIPE_SECRET_KEY
+		try:
+			session = stripe.checkout.Session.retrieve(session_id)
+		except Exception:
+			return Response({'detail': 'Unable to verify Stripe session.'}, status=status.HTTP_400_BAD_REQUEST)
+
+		payment_status = getattr(session, 'payment_status', None)
+		if payment_status != 'paid':
+			return Response({'detail': 'Payment is not completed yet.'}, status=status.HTTP_400_BAD_REQUEST)
+
+		metadata = getattr(session, 'metadata', None)
+		order_id = _metadata_value(metadata, 'order_id')
+		payment_intent = getattr(session, 'payment_intent', None)
+		_mark_stripe_payment_paid(order_id, session_id, payment_intent)
+
+		return Response(
+			{
+				'detail': 'Payment successful.',
+				'order_id': order_id,
+				'session_id': session_id,
+				'payment_status': payment_status,
+			},
+			status=status.HTTP_200_OK,
+		)
+
+
+class StripeCancelView(APIView):
+	authentication_classes = []
+	permission_classes = [AllowAny]
+
+	def get(self, request):
+		return Response({'detail': 'Payment cancelled.'}, status=status.HTTP_200_OK)
+
+
 class StripeWebhookView(APIView):
 	authentication_classes = []
 	permission_classes = [AllowAny]
@@ -156,19 +239,7 @@ class StripeWebhookView(APIView):
 			order_id = data_object.get('metadata', {}).get('order_id')
 			session_id = data_object.get('id')
 			payment_intent = data_object.get('payment_intent')
-
-			payment = Payment.objects.filter(transaction_id=session_id).first()
-			if not payment and order_id:
-				payment = Payment.objects.filter(order_id=str(order_id), payment_method='stripe').order_by('-created_at').first()
-
-			if payment:
-				payment.status = 'paid'
-				payment.transaction_id = payment_intent or session_id
-				payment.save(update_fields=['status', 'transaction_id'])
-
-			if order_id:
-				Order.objects.filter(pk=order_id).update(status='paid')
-				send_order_paid_email.delay(int(order_id))
+			_mark_stripe_payment_paid(order_id, session_id, payment_intent)
 
 		elif event_type in ['checkout.session.async_payment_failed', 'payment_intent.payment_failed']:
 			order_id = data_object.get('metadata', {}).get('order_id')

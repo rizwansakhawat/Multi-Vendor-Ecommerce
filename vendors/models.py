@@ -6,7 +6,7 @@ from accounts.models import User
 
 class VendorProfile(models.Model):
 
-    user = models.OneToOneField(User,on_delete=models.CASCADE)
+    user = models.OneToOneField(User,on_delete=models.CASCADE, related_name='vendor_profile')
     shop_name = models.CharField(max_length=200)
     shop_slug = models.SlugField(unique=True)
     shop_logo = models.ImageField(upload_to='shops/', blank=True, null=True)
