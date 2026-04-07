@@ -8,7 +8,7 @@ from django.contrib.auth.admin import UserAdmin
 class CustomUserAdmin(UserAdmin):
 
     model = User
-    list_display = ('email', 'username', 'role', 'email_verified', 'is_staff', 'is_active')
+    list_display = ('id','email', 'username', 'role', 'email_verified', 'is_staff', 'is_active')
     list_filter = ('role', 'email_verified', 'is_staff', 'is_active')
     fieldsets = (
         (None, {'fields': ('email', 'password')}),

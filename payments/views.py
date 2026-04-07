@@ -73,6 +73,7 @@ class PaymentViewSet(viewsets.ModelViewSet):
 			raise ValidationError({'order_id': 'order_id is required.'})
 
 		order = self._get_accessible_order(request.user, order_id)
+
 		if order.status == 'paid':
 			raise ValidationError({'detail': 'This order is already paid.'})
 
@@ -160,6 +161,32 @@ def _metadata_value(metadata, key):
 		return None
 
 
+def _to_mapping(value):
+	if value is None:
+		return {}
+
+	if isinstance(value, dict):
+		return value
+
+	to_dict_recursive = getattr(value, 'to_dict_recursive', None)
+	if callable(to_dict_recursive):
+		try:
+			mapped_value = to_dict_recursive()
+			if isinstance(mapped_value, dict):
+				return mapped_value
+		except Exception:
+			pass
+
+	items = getattr(value, 'items', None)
+	if callable(items):
+		try:
+			return dict(items())
+		except Exception:
+			pass
+
+	return {}
+
+
 class StripeSuccessView(APIView):
 	authentication_classes = []
 	permission_classes = [AllowAny]
@@ -232,17 +259,22 @@ class StripeWebhookView(APIView):
 		except Exception:
 			return Response({'detail': 'Invalid Stripe payload.'}, status=status.HTTP_400_BAD_REQUEST)
 
-		event_type = event.get('type')
-		data_object = event.get('data', {}).get('object', {})
+		event_map = _to_mapping(event)
+		event_type = event_map.get('type') or getattr(event, 'type', None)
+
+		event_data = event_map.get('data') or getattr(event, 'data', None)
+		event_data_map = _to_mapping(event_data)
+		data_object = _to_mapping(event_data_map.get('object'))
 
 		if event_type == 'checkout.session.completed':
-			order_id = data_object.get('metadata', {}).get('order_id')
+			metadata = data_object.get('metadata')
+			order_id = _metadata_value(metadata, 'order_id')
 			session_id = data_object.get('id')
 			payment_intent = data_object.get('payment_intent')
 			_mark_stripe_payment_paid(order_id, session_id, payment_intent)
 
 		elif event_type in ['checkout.session.async_payment_failed', 'payment_intent.payment_failed']:
-			order_id = data_object.get('metadata', {}).get('order_id')
+			order_id = _metadata_value(data_object.get('metadata'), 'order_id')
 			if order_id:
 				Payment.objects.filter(order_id=str(order_id), payment_method='stripe').update(status='failed')
 

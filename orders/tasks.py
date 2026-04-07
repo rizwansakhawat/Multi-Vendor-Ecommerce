@@ -83,3 +83,30 @@ def send_order_paid_email(order_id):
             vendor_emails,
             fail_silently=True,
         )
+
+
+
+
+
+
+# # # # @shared_task
+# # # # def send_test_email(receiver_email):
+# # # #     subject = 'Celery Test Email'
+# # # #     message = 'If you are reading this, your Celery worker and Gmail SMTP are working!'
+    
+# # # #     send_mail(
+# # # #         subject,
+# # # #         message,
+# # # #         settings.DEFAULT_FROM_EMAIL,
+# # # #         [receiver_email],
+# # # #         fail_silently=False,
+# # # #     )
+# # # #     return f"Email sent to {receiver_email}"
+
+
+
+# # # # from orders.tasks import send_test_email
+# # # # task = send_test_email.delay("rizwansakhawat111@gmail.com")
+
+# # # # print(f"Task ID: {task.id}")
+# # # # print(f"Task Status: {task.status}")
